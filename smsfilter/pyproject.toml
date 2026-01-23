@@ -1,0 +1,7 @@
+[tool.ruff]
+lint.ignore = ["F401", "F811"]
+[tool.pyright]
+reportOptionalIterable = "none"
+reportOptionalSubscript = "none"
+reportUnknownMemberType = "none"
+reportPossiblyUnboundVariable = "none"

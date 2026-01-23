@@ -1,0 +1,11 @@
+services:
+  backend:
+    image: smsfilter-backend:latest
+    container_name: smsfilter-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    user: "${UID}:${GID}"
+    environment:
+      - HF_HOME=${APP_DIR}/.cache/huggingface

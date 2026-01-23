@@ -1,0 +1,17 @@
+[project]
+name = "smsfilter-settings"
+version = "0.0.2.dev"
+description = "Shared settings for the SMS Filter application."
+requires-python = ">=3.12.0, <3.13.0"
+dependencies = ["pydantic>=2.12", "pydantic-settings>=2.11"]
+
+[tool.uv]
+dev-dependencies = ["ruff>=0.12.3"]
+package = true
+
+
+# Added by habushu-maven-plugin at 2026-01-18T17:32:28.399642633 to use https://pypi.org/simple/ as source repository for installing dependencies
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple/"
+publish-url = "https://pypi.org/simple/"

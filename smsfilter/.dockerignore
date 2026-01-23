@@ -1,0 +1,9 @@
+.git
+.gitignore
+.idea
+.vscode
+README.md
+**/target
+**/node_modules
+__pycache__
+*.pyc
