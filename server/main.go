@@ -16,7 +16,8 @@ import (
 var server *gin.Engine
 var startTime time.Time
 var filterWG sync.WaitGroup
-var filterResultChan chan helpers.FilterResult
+var filterResultChan chan helpers.FilterResult // Channel to process results from filter API
+var filterAPIChan chan struct{}                // Channel to potentially limit concurrent API calls
 
 func main() {
 	var err error
@@ -32,11 +33,23 @@ func main() {
 	}
 
 	// Initialize channel for filter results
-	filterResultChan = make(chan helpers.FilterResult, 10)
+	// Create buffered channel to limit concurrent result processing
+	if cfg.Filter.ResultChanSize != 0 {
+		filterResultChan = make(chan helpers.FilterResult, cfg.Filter.ResultChanSize)
+	} else {
+		filterResultChan = make(chan helpers.FilterResult)
+	}
 
 	// Set global variables in helpers package with update function
-	// Max 5 concurrent filter checks at a time
-	helpers.SetFilterGlobals(&filterWG, filterResultChan, cfg.Filter.MaxConcurrent, cfg.Filter.APIURL)
+	// Create buffered channel to limit concurrent filter API calls
+	if cfg.Filter.MaxConcurrent != 0 {
+		filterAPIChan = make(chan struct{}, cfg.Filter.MaxConcurrent)
+	} else {
+		filterAPIChan = make(chan struct{})
+	}
+
+	// Init helpers
+	helpers.SetFilterGlobals(&filterWG, filterResultChan, filterAPIChan, cfg.Filter.APIURL)
 
 	// Pass waitgroup to routes for goroutine spawning
 	routes.SetFilterWaitGroup(&filterWG)

@@ -41,12 +41,13 @@ func Load() *Config {
 	viper.AddConfigPath("./config")
 
 	// Set defaults
-	viper.SetDefault("server.port", "8080")
-	viper.SetDefault("server.host", "0.0.0.0")
-	viper.SetDefault("database.path", "smsrequest.db")
-	viper.SetDefault("filter.apiurl", "http://192.168.8.100:8000/api/v0/filter/sms")
-	viper.SetDefault("filter.maxconcurrent", 5)
-	viper.SetDefault("filter.resultchansize", 10)
+	// Defaults will be defined in the config.yaml
+	//viper.SetDefault("server.port", "8080")
+	//viper.SetDefault("server.host", "0.0.0.0")
+	//viper.SetDefault("database.path", "smsrequest.db")
+	//viper.SetDefault("filter.apiurl", "http://192.168.8.100:8000/api/v0/filter/sms")
+	//viper.SetDefault("filter.maxconcurrent", 5)
+	//viper.SetDefault("filter.resultchansize", 10)
 
 	// Read config file (optional - won't error if not found)
 	viper.ReadInConfig()

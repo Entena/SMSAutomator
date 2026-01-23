@@ -21,7 +21,7 @@ var filterAPIURL string
 
 var filterWG *sync.WaitGroup
 var filterResultChan chan FilterResult
-var semaphore chan struct{}
+var filterAPIChan chan struct{}
 
 type FilterResult struct {
 	SMSID   uuid.UUID
@@ -43,10 +43,10 @@ type SMSResponse struct {
 }
 
 // SetFilterGlobals sets the waitgroup, channel, and API URL from main
-func SetFilterGlobals(wg *sync.WaitGroup, ch chan FilterResult, maxConcurrent int, apiURL string) {
+func SetFilterGlobals(wg *sync.WaitGroup, ch chan FilterResult, semaphore chan struct{}, apiURL string) {
 	filterWG = wg
 	filterResultChan = ch
-	semaphore = make(chan struct{}, maxConcurrent)
+	filterAPIChan = semaphore
 	filterAPIURL = apiURL
 }
 
@@ -85,8 +85,8 @@ func CheckSMSMessage(smsID uuid.UUID, message string) {
 	defer filterWG.Done() // WG will decrement on function finish
 
 	// Acquire semaphore slot (blocks if max concurrent reached)
-	semaphore <- struct{}{}
-	defer func() { <-semaphore }() // Release slot when done
+	filterAPIChan <- struct{}{}
+	defer func() { <-filterAPIChan }() // Release slot when done
 
 	blocked, err := checkSMSMessage(message)
 	filterResultChan <- FilterResult{

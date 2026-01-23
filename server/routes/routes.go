@@ -60,7 +60,7 @@ func GetSMSRequest(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("SMSRequest ID %s not found", sms_id)})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("SMSRequest found"), "smsrequest": smsrequest})
+	c.JSON(http.StatusOK, gin.H{"message": "SMSRequest found", "smsrequest": smsrequest})
 }
 
 func UpdateSMSRequest(c *gin.Context) {
