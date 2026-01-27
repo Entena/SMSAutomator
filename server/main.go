@@ -88,6 +88,9 @@ func setupRoutes() {
 		apiGroup.GET("/smsrequest", routes.GetSMSRequest)
 		apiGroup.GET("/ready", routes.GetReadyToSendSMS)
 		apiGroup.PATCH("/smsrequest", routes.UpdateSMSRequest)
+		apiGroup.GET("/optin", routes.GetReadyToAskOptIn)
+		apiGroup.POST("/optin", routes.GetPhoneOptIn)
+		apiGroup.PATCH("/optin", routes.UpdatePhoneOptIn)
 	}
 
 }

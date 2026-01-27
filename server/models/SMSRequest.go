@@ -3,7 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
-	"regexp"
+	"microsms/constants"
 
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
@@ -12,33 +12,33 @@ import (
 
 var DB *gorm.DB // Global DB pointer
 
-// represent enum as strings cause I hate mapping this
-type RequestStatus string
-
-const (
-	PAYMENT_OWED  RequestStatus = "payment_owed"
-	READY_TO_SEND RequestStatus = "ready_to_send"
-	TAKEN         RequestStatus = "taken"
-	SENT          RequestStatus = "sent"
-	ERROR         RequestStatus = "error"
-	BLOCKED       RequestStatus = "blocked"
-)
-
-// Enums don't necessarily restrict input
-func IsValidStatus(status string) bool {
-	if status != "payment_owed" && status != "ready_to_send" && status != "taken" && status != "sent" && status != "error" && status != "blocked" {
-		return false
-	}
-	return true
-}
-
 // SMSRequest definition
 type SMSRequest struct {
-	ID      uuid.UUID     `json:"id" gorm:"primary_key"`
-	Number  string        `json:"number" gorm:"not null"`
-	Status  RequestStatus `json:"status"`
-	Message string        `json:"message"`
-	Created int64         `json:"created" gorm:"autoCreateTime"`
+	ID         uuid.UUID               `json:"id" gorm:"primary_key"`
+	ToNumber   string                  `json:"to_number" gorm:"not null"`
+	FromNumber string                  `json:"from_number" gorm:"not null"`
+	Status     constants.RequestStatus `json:"status"`
+	Message    string                  `json:"message"`
+	Created    int64                   `json:"created" gorm:"autoCreateTime"`
+}
+
+// This should never happen, but hey if it does we can at least log something
+func (smsrequest *SMSRequest) ToNumberF() string {
+	f_phone, err := constants.GetPhone(smsrequest.ToNumber)
+	if err != nil {
+		fmt.Printf("ERROR COULD NOT RETURN A FORMATTED TO PHONE NUMBER!!! THIS REQUIRES MANUAL REMEDIATION")
+		return smsrequest.ToNumber
+	}
+	return f_phone
+}
+
+func (smsrequest *SMSRequest) FromNumberF() string {
+	f_phone, err := constants.GetPhone(smsrequest.ToNumber)
+	if err != nil {
+		fmt.Printf("ERROR COULD NOT RETURN A FORMATTED TO PHONE NUMBER!!! THIS REQUIRES MANUAL REMEDIATION")
+		return smsrequest.ToNumber
+	}
+	return f_phone
 }
 
 // To String my struct
@@ -49,25 +49,41 @@ func (smsrequest SMSRequest) String() string {
 // Good old precreate hook to populate the id
 func (smsrequest *SMSRequest) BeforeCreate(tx *gorm.DB) error {
 	smsrequest.ID = uuid.New()
-	smsrequest.Status = PAYMENT_OWED
-	return nil
-}
+	// First we need to check that the numbers are ok
+	smsrequest.Status = constants.RequestStatus_VERIFY_CHECK
+	// Create the RequestAuth entry, fail in same txn if either can't be made
+	requestAuth := RequestAuth{
+		RequestID: smsrequest.ID,            // dupe data because each request is a session to contact
+		From:      smsrequest.FromNumberF(), //Get formatted data for request auth
+		To:        smsrequest.ToNumberF(),
+	}
+	err := DB.Create(&requestAuth).Error
+	if err != nil {
+		return err
+	}
+	// Check our request auth status to see if we are naughty
+	// cascade our status up
+	if requestAuth.Status == constants.RequestAuthStatus_DENIED {
+		smsrequest.Status = constants.RequestStatus_BLOCKED
+	} else if requestAuth.Status == constants.RequestAuthStatus_READY {
+		smsrequest.Status = constants.RequestStatus_READY_TO_SEND
+	} else {
+		smsrequest.Status = constants.RequestStatus_VERIFY_CHECK
+	}
 
-// Helper for phone numbers
-func IsValidPhone(number string) bool {
-	// Define a regex pattern for phone numbers with an area code
-	var phoneRegex = `^(?:\(\d{3}\)|\d{3})[-. ]?\d{3}[-. ]?\d{4}$`
-	re := regexp.MustCompile(phoneRegex)
-	return re.MatchString(number)
+	return nil
 }
 
 // Method to create new SMSRequest
 func CreateSMSRequest(smsrequest *SMSRequest) error {
 	if smsrequest.Message == "" {
-		return errors.New(fmt.Sprintf("Error invalid message %s", smsrequest.Message))
+		return fmt.Errorf("Error invalid message %s", smsrequest.Message)
 	}
-	if !IsValidPhone((smsrequest.Number)) {
-		return errors.New(fmt.Sprintf("Error invalid phone number %s", smsrequest.Number))
+	if !constants.IsValidPhone((smsrequest.ToNumber)) {
+		return fmt.Errorf("Error invalid to phone number %s", smsrequest.ToNumber)
+	}
+	if !constants.IsValidPhone(smsrequest.FromNumber) { // Get the raw numbers on purpose
+		return fmt.Errorf("Error invalid from phone number %s", smsrequest.FromNumber)
 	}
 	result := DB.Create(smsrequest)
 	if result.Error != nil {
@@ -79,9 +95,9 @@ func CreateSMSRequest(smsrequest *SMSRequest) error {
 }
 
 // Update SMSRequest with new status
-func UpdateSMSRequest(id string, newStatus RequestStatus) (*SMSRequest, error) {
-	if !IsValidStatus(string(newStatus)) {
-		return nil, errors.New(fmt.Sprintf("Error invalid status %s", newStatus))
+func UpdateSMSRequest(id string, newStatus constants.RequestStatus) (*SMSRequest, error) {
+	if !constants.IsValidRequestStatus(string(newStatus)) {
+		return nil, fmt.Errorf("Error invalid status %s", newStatus)
 	}
 	smsrequest, err := GetSMSRequest(id)
 	if err != nil {
@@ -118,7 +134,7 @@ func GetSMSRequest(id string) (*SMSRequest, error) {
 func GetEarliestSMSRequest() (*SMSRequest, error) {
 	fmt.Printf("GET EARLIEST SMSREQUEST")
 	var earliest SMSRequest
-	result := DB.Model(&SMSRequest{}).Where(&SMSRequest{Status: READY_TO_SEND}).Order("created ASC").First(&earliest)
+	result := DB.Model(&SMSRequest{}).Where(&SMSRequest{Status: constants.RequestStatus_READY_TO_SEND}).Order("created ASC").First(&earliest)
 	if result.Error != nil {
 		fmt.Printf("Error finding ready to send SMS")
 	}
@@ -135,6 +151,8 @@ func InitDB(dbPath string) (*gorm.DB, error) {
 	}
 	DB = db
 	DB.AutoMigrate(&SMSRequest{}) // create the reqeuest table
+	DB.AutoMigrate(&RequestAuth{})
+	DB.AutoMigrate(&OptIn{})
 	fmt.Println("DB Inited")
 	return DB, nil
 }

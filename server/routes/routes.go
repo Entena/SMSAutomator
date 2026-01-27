@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+	"microsms/constants"
 	"microsms/helpers"
 	"microsms/models"
 	"net/http"
@@ -86,7 +87,7 @@ func UpdateSMSRequest(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("SMSRequest ID %s not found", sms_id)})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("SMSRequest found"), "smsrequest": smsrequest})
+	c.JSON(http.StatusOK, gin.H{"message": "SMSRequest found", "smsrequest": smsrequest})
 }
 
 func GetReadyToSendSMS(c *gin.Context) {
@@ -96,4 +97,54 @@ func GetReadyToSendSMS(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("SMS Request %s ready to send", smsrequest.ID), "smsrequest": smsrequest})
+}
+
+func GetPhoneOptIn(c *gin.Context) {
+	optInSearch := &models.OptIn{}
+	var err error
+	if err = c.ShouldBindBodyWithJSON(optInSearch); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to parse payload %s", err)})
+		return
+	}
+	if optInSearch.Number, err = constants.GetPhone(optInSearch.Number); err != nil {
+		//Combo calls the check and gives us the necessary assignment
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid phone number %s", err)})
+		return
+	}
+	optInSearch, err = models.GetOptIn(optInSearch.Number)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Failed to find OptIn record %s", err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("OptIn record found for %s", optInSearch.Number), "optin": optInSearch})
+}
+
+func GetReadyToAskOptIn(c *gin.Context) {
+	optin, err := models.GetEarliestOptIn()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed to find ready to ask OptIn %s", err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("OptIn %s ready to ask", optin.Number), "optin": optin})
+}
+
+func UpdatePhoneOptIn(c *gin.Context) {
+	var optinupdate models.OptIn
+	var err error
+
+	if err = c.ShouldBindJSON(&optinupdate); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("FAILED TO PARSE PAYLOAD %s", err)})
+		return
+	}
+	if optinupdate.Number, err = constants.GetPhone(optinupdate.Number); err != nil {
+		//Combo calls the check and gives us the necessary assignment
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid phone number %s", err)})
+		return
+	}
+	optinupdated, err := models.UpdateOptIn(optinupdate.Number, optinupdate.Status)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Failed updating OptIn %s", err)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "OptIn updated", "optin": optinupdated})
 }

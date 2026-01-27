@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"microsms/constants"
 	"microsms/models"
 	"net/http"
 	"sync"
@@ -57,7 +58,7 @@ func HandleFilterResults() {
 
 		if result.Err != nil {
 			fmt.Printf("Error filtering SMS %s: %s\n", result.SMSID, result.Err)
-			_, err := models.UpdateSMSRequest(result.SMSID.String(), models.ERROR)
+			_, err := models.UpdateSMSRequest(result.SMSID.String(), constants.RequestStatus_ERROR)
 			if err != nil {
 				fmt.Printf("Failed to update SMS %s to ERROR status: %s\n", result.SMSID, err)
 			}
@@ -66,13 +67,13 @@ func HandleFilterResults() {
 
 		if result.Blocked {
 			fmt.Printf("SMS %s was blocked by filter\n", result.SMSID)
-			_, err := models.UpdateSMSRequest(result.SMSID.String(), models.BLOCKED)
+			_, err := models.UpdateSMSRequest(result.SMSID.String(), constants.RequestStatus_BLOCKED)
 			if err != nil {
 				fmt.Printf("Failed to update SMS %s to BLOCKED status: %s\n", result.SMSID, err)
 			}
 		} else {
 			fmt.Printf("SMS %s passed filter, marking as READY_TO_SEND\n", result.SMSID)
-			_, err := models.UpdateSMSRequest(result.SMSID.String(), models.READY_TO_SEND)
+			_, err := models.UpdateSMSRequest(result.SMSID.String(), constants.RequestStatus_READY_TO_SEND)
 			if err != nil {
 				fmt.Printf("Failed to update SMS %s to READY_TO_SEND status: %s\n", result.SMSID, err)
 			}
